@@ -1,10 +1,20 @@
 #include "Atom.h"
+#include "Constants.h"
+#include "MyMath.h"
 #include <fstream>
 #include <iostream>
+#include <cmath>
+
+void pg::generateNorm(std::vector<int> &qnums){
+	norm=std::pow((2.0*a/MyPI),3.0/4.0);
+	norm*=std::pow(4.0*a, (double)(qnums[0]+qnums[1]+qnums[2])/2.0);
+	int facstuff=(fac2(2*qnums[0]-1)*fac2(2*qnums[1]-1)*fac2(2*qnums[2]-1));
+	norm/=std::sqrt(facstuff);
+}
 
 void Orbital::printorbital(){
 	std::string names="SPD";
-	std::cout << qnums[0] << " " << qnums[1] << " " << qnums[2] << " : " << names[qnums[0]+qnums[1]+qnums[2]]<<std::endl;
+	std::cout << qnums[0] << " " << qnums[1] << " " << qnums[2] << " : " << names[qnums[0]+qnums[1]+qnums[2]]<<" ("<<pos[0]<<","<<pos[1]<<","<<pos[3]<<")\n";
 	for(auto &a: pgs){
 		std::cout << a.a << " " << a.c << std::endl;
 	}
@@ -24,6 +34,7 @@ void Atom::buildorbitals(std::string basisfile){
 	char orbitaltype;
 	std::vector<Orbital> tempOrbitals;
 
+	bool hybrid=false;
 	while(!inFile.eof()){
 		std::getline(inFile,linestr);
 		if(linestr==atomname) {loading=true;continue;}
@@ -31,18 +42,34 @@ void Atom::buildorbitals(std::string basisfile){
 			if(linestr.empty()) break;
 			if(pgcount==-1){
 				orbitaltype=linestr[0];
+				hybrid=orbitaltype=='L';
 				pgcount=std::stoi(linestr.substr(1))-1;
 				tempOrbitals=constructOrbitals(orbitaltype);
 			}	
 			else{
-				std::cout << linestr<< std::endl;
+				
 				linestr=linestr.substr(1);
 				int pos=linestr.find_first_not_of(' ');
 				linestr=linestr.substr(pos);
 				pos=linestr.find_first_of(' ');
-				double a=std::stod(linestr.substr(0,pos)),
-				    c=std::stod(linestr.substr(pos));
-				for(auto &t:tempOrbitals) t.addPG(pg(a,c));
+				if(!hybrid){
+					double a=std::stod(linestr.substr(0,pos)),
+				    		c=std::stod(linestr.substr(pos));
+					for(auto &t:tempOrbitals) t.addPG(pg(a,c));
+				}
+				else{
+					double a=std::stod(linestr.substr(0,pos));
+					linestr=linestr.substr(linestr.find_first_not_of(' '));
+					linestr=linestr.substr(linestr.find_first_of(' '));
+					linestr=linestr.substr(linestr.find_first_not_of(' '));
+					pos=linestr.find_first_of(' ');
+					double cs=std::stod(linestr.substr(0,pos)),
+						cp=std::stod(linestr.substr(pos));
+					for(auto &t:tempOrbitals) {
+						double ctouse=(t.type==0)?cs:cp;
+						t.addPG(pg(a,ctouse));
+					}	
+				}
 				if(--pgcount == -1){
 					for(auto a:tempOrbitals) orbitals.push_back(a);	
 				}
@@ -65,29 +92,40 @@ std::vector<Orbital> Atom::constructOrbitals(char type){
 	switch(type){
 	case 'S':{
 		Orbital o;
+		o.type=0;
 		orbitals.push_back(o);
 	}break;
 	case 'P':{
 		for(int i = 0; i < 3; i++){
 			Orbital o;
 			o.qnums[i]=1;
+			o.type=1;
 			orbitals.push_back(o);
 		}
+	}break;
+	case 'L':{
+		std::vector<Orbital> sorbs=constructOrbitals('S');
+		std::vector<Orbital> porbs=constructOrbitals('P');
+		orbitals.push_back(sorbs[0]);
+		for(auto &o: porbs) orbitals.push_back(o);
 	}break;
 	case 'D':{
 		for(int i = 0; i < 3; i++){
 			Orbital o;
 			o.qnums[i]=2;
+			o.type=2;
 			orbitals.push_back(o);
 		}
 		for(int i = 0; i < 3; i++){
 			Orbital o;
 			o.qnums=std::vector<int>{1,1,1};
 			o.qnums[i]=0;
+			o.type=2;
 			orbitals.push_back(o);
 		}
 	}break;
 	}
+	for(auto &o: orbitals){o.pos=pos;}
 	return orbitals;
 }
 
@@ -97,6 +135,17 @@ void Molecule::init(std::string bset){
 		A.buildorbitals(bset);
 		orbitalcount+=A.orbitals.size();
 	}
+}
+
+Orbital & Molecule::getOrbital(int n){
+	int ocnt=0;
+	for(auto & a: atoms){
+		for(auto &o:a.orbitals){
+			if(ocnt++==n) return o;
+		}
+	}
+	std::cout << "ORBITAL OVERFLOW\n";
+	return atoms[0].orbitals[0];
 }
 
 std::vector<std::string> Atom::namelist = std::vector<std::string>{"HYDROGEN","HELIUM","LITHIUM","BERYLLIUM","BORON","CARBON","NITROGEN","OXYGEN","FLUORINE","NEON","SODIUM","MAGNESIUM","ALUMINIUM","SILICON","PHOSPHORUS","SULFUR","CHLORINE","ARGON"};

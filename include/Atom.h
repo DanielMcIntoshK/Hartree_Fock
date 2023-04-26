@@ -9,13 +9,29 @@ struct pg{
 
 	double a;
 	double c;
+
+	void generateNorm(std::vector<int> &qnums);
+
+	double norm;
 };
 
 struct Orbital{
-	void addPG(pg newpg) {pgs.push_back(newpg);}
+	void addPG(pg newpg) {newpg.generateNorm(qnums);pgs.push_back(newpg);}
 	
 	std::vector<pg> pgs; 
 	std::vector<int> qnums=std::vector<int>{0,0,0};
+	std::vector<double> pos=std::vector<double>{0,0,0};
+	unsigned char type;
+
+	Orbital getrel(int off, int dir){
+		Orbital no;
+		no.pgs=pgs;
+		no.pos=pos;
+		no.qnums=qnums;
+		no.qnums[dir]+=off;
+		no.type=type;
+		return no;
+	}
 
 	void printorbital();
 };
@@ -32,6 +48,8 @@ public:
 	std::vector<Orbital> orbitals;
 
 	std::vector<double> pos;
+	
+	std::string getName() {return namelist[atnum-1];}
 
 	static std::vector<std::string> namelist;
 private:
@@ -45,6 +63,7 @@ struct Molecule{
 	int orbitalcount;
 
 	void init(std::string bset);
+	Orbital& getOrbital(int n);
 };
 
 #endif
