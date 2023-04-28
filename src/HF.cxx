@@ -53,6 +53,10 @@ void HF::HFStep(){
 	computeInteraction(P);
 	if(verbose) std::cout << "CALC ee interaction\n";
 
+	std::cout << "INTERACTION\n";
+	eeI.printMatrix();
+	std::cout << std::endl;
+
 	F = Matrix::matAdd(cH,eeI);
 	
 	if(verbose){

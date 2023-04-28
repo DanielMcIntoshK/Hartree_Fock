@@ -30,15 +30,17 @@ int main(int argc, char ** argv){
 	bool verbose=true;
 
 	DistributedMatrix S=computeSMatrixPar(mol);
-	
+	Matrix Sm=computeSMatrix(mol);
 	if(verbose){
 		if(S.procno==0)std::cout << "OVERLAP MATRIX\n";
 		S.printMatrix();
 	}
 
-	DistributedEigenSolver des(S, 0.000001);
+	DistributedEigenSolver des(S, 0.000000001);
 	DistributedEigenSolver::EigenData ded = des.calculateEigens();
 	
+	EigenSolver es(Sm, 0.000001);
+	EigenSolver::EigenData ed = es.calculateEigens();
 
 	if(verbose){
 	if(S.procno==0){
@@ -55,6 +57,9 @@ int main(int argc, char ** argv){
 	}
 	DistributedMatrix diag=DistributedMatrix::diag(ded.eigenVals);
 	diag.printMatrix();
+
+	Matrix mdiag=Matrix::diag(ed.eigenVals);
+	Matrix Xm = Matrix::matMul(ed.eigenVecs,mdiag);
 	
 	
 	DistributedMatrix X=DistributedMatrix::matMul(ded.eigenVecs,diag);
@@ -71,13 +76,14 @@ int main(int argc, char ** argv){
 	}
 
 
-	//DistributedMatrix test = DistributedMatrix::matMul(X,S);
-	//test=DistributedMatrix::matMul(test,Xt);
-	//if(test.procno==0)std::cout << "TEST SHOULD BE IDENT\n";
-	//test.printMatrix();
+	DistributedMatrix test = DistributedMatrix::matMul(Xt,S);
+	test=DistributedMatrix::matMul(test,X);
+	if(test.procno==0)std::cout << "TEST SHOULD BE IDENT\n";
+	test.printMatrix();
 
 	
 	DistributedMatrix cH=computeCoreHamiltonianMatrixPar(mol);
+	Matrix cHm=computeCoreHamiltonianMatrix(mol);
 
 	if(verbose){
 	if(cH.procno==0)std::cout << "CORE HAMILTONIAN\n";
@@ -86,61 +92,34 @@ int main(int argc, char ** argv){
 	}
 
 	DistributedMatrix ld=computeEEMatriciesPar(mol);
-	
+	list4D ldm = computeEEMatricies(mol);
 
-	/*
-	std::vector<int> sl{0,3,1,4,2,5,6};
-	ed.eigenVecs.sort(sl);
-	std::vector<double> sv;
-	sv.resize(sl.size());
-	for(int i = 0;i < sv.size();i++) sv[i]=ed.eigenVals[sl[i]];
-	ed.eigenVals=sv;
+	std::vector<double> ldmat=ld.gatherMat();
+	if(S.procno==0){
+	for(int p = 0; p < ldmat.size();p++){
+		int dim = S.rows;
+		int i=(p/(dim*dim*dim))%dim,
+		    j=(p/(dim*dim))%dim,
+		    k=(p/(dim))%dim,
+		    l=p%dim;
 
-	
-	sl=std::vector<int>{1,2,3};
-	for(auto a: sl){
-		for(int r=0;r<ed.eigenVecs.cols;r++){
-			std::cout << r << " " << a << " " << ed.eigenVecs(r,a)<<std::endl;
-			ed.eigenVecs.setElement(r,a,-ed.eigenVecs(r,a));
-		}
+		std::cout << "("<<i+1<<","<<j+1<<","<<k+1<<","<<l+1<<") "<<ldmat[p]<<" "<<ldm[i][j][k][l]<<std::endl;
 	}
-	
-	std::cout << "\nEIGENVALS: ";
-	for(auto a: ed.eigenVals) std::cout << a << " ";
-	std::cout << std::endl;
-	std::cout << "EIGENVECS:\n";
-	ed.eigenVecs.printMatrix();
-	std::cout << std::endl;
-	*/
-	//Matrix diag=Matrix::diag(ed.eigenVals);
-	//Matrix eigenVecinv=ed.eigenVecs.transpose();
-
-	//Matrix temp=Matrix::matMul(diag,eigenVecinv);
-	//Matrix X = Matrix::matMul(ed.eigenVecs,diag);
-	/*if(verbose){
-	std::cout << std::endl;
-	std::cout << "TRANSFORM MATRIX\n";
-	X.printMatrix();
 	}
 
-	Matrix Xt=X.transpose();
-	
-	if(verbose){
-	Matrix com = Matrix::matMul(Xt,S);
-	com=Matrix::matMul(com,X);
-	std::cout << "COMBINED TEST\n";
-	com.printMatrix();
+	DistributedMatrix P_init(S.rows,S.cols,MPI_COMM_WORLD);
+	Matrix P_initm(Sm.rows, Sm.cols);
+
+	if(S.procno==0){
+		HF hartreefockSolver(Sm,Xm,cHm,ldm);
+		hartreefockSolver.calculateEnergy(mol,P_initm,0,verbose);
 	}
-	*/
+
+	HFPar hartreefockSolver(S,X,cH,ld);
+	hartreefockSolver.calculateEnergy(mol,P_init,0,verbose);
 
 	MPI_Finalize();
 
 	return 0;
 
-	Matrix P_init(S.rows,S.cols);
-
-	//HF hartreefockSolver(S,X,cH,ld);
-	//hartreefockSolver.calculateEnergy(mol,P_init,0,verbose);
-
-	return 0;
 }

@@ -377,12 +377,12 @@ DistributedMatrix computeEEMatriciesPar(Molecule & mol){
 	int eecount=0;
 
 	for(int p = 0; p < l4d.data.size(); p++){
+		int mloc=p+l4d.startpos;
 		int i,j,k,l;
-		i=(p/(dim*dim*dim))%dim;
-		j=(p/(dim*dim))%dim;
-		k=(p/dim)%dim;
-		l=p%dim;
-
+		i=(mloc/(dim*dim*dim))%dim;
+		j=(mloc/(dim*dim))%dim;
+		k=(mloc/dim)%dim;
+		l=mloc%dim;
 		double ev = electronic(mol.getOrbital(i), mol.getOrbital(j), mol.getOrbital(k), mol.getOrbital(l));
 
 		l4d.data[p]=ev;

@@ -155,6 +155,13 @@ DistributedMatrix DistributedMatrix::matMul(DistributedMatrix &m1, DistributedMa
 			MPI_Barrier(m1.comm);
 		}
 	}
+	for(int i = 0; i < rowcomms.size(); i++){
+		MPI_Comm_free(&rowcomms[i]);
+	}
+	for(int j = 0; j < colcomms.size(); j++){
+		MPI_Comm_free(&colcomms[j]);
+	}
+
 	return mm;	
 }
 
@@ -183,6 +190,33 @@ DistributedMatrix DistributedMatrix::matAdd(DistributedMatrix &m1, DistributedMa
 		am.data[i]=m1.data[i]+m2.data[i];
 	}
 	return am;
+}
+
+void DistributedMatrix::sort(std::vector<int> sortvals){
+	std::vector<double> newdata;
+	newdata.resize(data.size());
+	for(int i = 0; i < rows; i++){
+		for(int j = 0; j < cols; j++){
+			int ijindex=rc2i(i,j);
+			int ijproc=i2proc(ijindex);
+
+			int ivindex=rc2i(i,sortvals[j]);
+			int ivproc=i2proc(ivindex);
+
+			double ivval;
+			if(ivproc==procno){
+				ivval=data[ivindex-startpos];
+				if(procno!=ijproc){
+					MPI_Send(&ivval,1,MPI_DOUBLE,ijproc,0,comm);
+				}
+			}
+			else if(ijproc==procno)
+				MPI_Recv(&ivval,1,MPI_DOUBLE,ivproc,0,comm,MPI_STATUS_IGNORE);
+
+			if(procno==ijproc) newdata[ijindex-startpos]=ivval;
+		}
+	}
+	data=newdata;
 }
 
 DistributedMatrix DistributedMatrix::transpose(){
@@ -272,6 +306,55 @@ void DistributedMatrix::printMatrix(){
 	}
 
 }
+std::vector<double> DistributedMatrix::gatherMat(){
+	std::vector<double> fullMat;
+	if(procno==0) fullMat.resize(size);
+
+	std::vector<int> recvcount, displace;
+	recvcount.resize(nprocs);
+	displace.resize(nprocs);
+
+	for(auto &a: recvcount)a=0;
+	for(auto &a: displace)a=0;
+
+	int runningcount=0;
+	int currentproc=0;
+
+	for(int i = 0; i < rows; i++){
+		for(int j = 0; j < cols; j++){
+			int lproc=i2proc(rc2i(i,j));
+			recvcount[lproc]++;
+			if(currentproc!=lproc){
+				displace[lproc]=runningcount;
+				currentproc=lproc;
+			}
+			runningcount++;
+		}
+	}
+
+	if(procno==0){
+	std::cout << "RECVCOUNTS: ";
+	for(auto & a: recvcount) std::cout << a << " ";
+	std::cout << std::endl;
+	
+	std::cout << "DISPLACEMENTS: ";
+	for(auto & a: displace) std::cout << a << " ";
+	std::cout << std::endl;
+	}
+
+	MPI_Gatherv(data.data(),blocksize,MPI_DOUBLE,fullMat.data(),recvcount.data(),displace.data(),
+			MPI_DOUBLE,0,comm);
+
+	return fullMat;
+	//if(procno!=0)return;
+
+
+	//for(int i = 0; i < fullMat.size(); i++){
+	//	std::cout << fullMat[i] << " ";
+	//	if(i%cols==cols-1)std::cout << std::endl;
+	//}
+
+}
 
 
 DistributedEigenSolver::DistributedEigenSolver(DistributedMatrix & inMat, double _t):threshold{_t},oMat{inMat},
@@ -293,15 +376,11 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 
 	findMaxUpperTriangle(cMat);
 	do{
-		if(cMat.procno==0){
-			std::cout << citer << std::endl;
-		}
 		jacobiRotate(cMat, ed);
 		findMaxUpperTriangle(cMat);
 		citer++;
 	}while(std::fabs(maxvl.val)>threshold && citer < maxiter);
 //cMat.printMatrix();
-	//std::cout << "GOT OUT " << maxvl.val << " " << threshold  << std::endl;
 	if(citer==maxiter&&oMat.procno==0) std::cout << "TIMEOUT\n";
 	for(int n = 0; n < cMat.rows; n++){
 		int nnproc=cMat.i2proc(cMat.rc2i(n,n));
@@ -359,7 +438,6 @@ void DistributedEigenSolver::findMaxUpperTriangle(DistributedMatrix &cMat){
 void DistributedEigenSolver::jacobiRotate(DistributedMatrix & cMat, EigenData & ed){
 	double c, s;
 	
-	//if(cMat.procno==0)std::cout << maxr << " " << maxc << " " <<maxvl.val << std::endl;
 	if(maxvl.val != 0.0){
 		double tau, t;
 		tau = (diagc-diagr)/(2.0*maxvalTrans);
@@ -376,7 +454,6 @@ void DistributedEigenSolver::jacobiRotate(DistributedMatrix & cMat, EigenData & 
 		c=1.0;
 		s=0.0;
 	}
-	//std::cout << c << " " << s << diagc << " " << diagr << " " << maxvl.val << std::endl;
 	for(int j = 0; j < cMat.rows; j++){
 		double iRow, jRow;
 		int iind=cMat.rc2i(maxr,j),
@@ -384,18 +461,15 @@ void DistributedEigenSolver::jacobiRotate(DistributedMatrix & cMat, EigenData & 
 		int iproc=cMat.i2proc(iind),
 		    jproc=cMat.i2proc(jind);
 
-		//if(cMat.procno==0)std::cout << j << " " <<iproc << " " << jproc<< std::endl;
 		if(iproc==cMat.procno) iRow=ed.eigenVecs.data[iind-cMat.startpos];
 		if(jproc==cMat.procno) jRow=ed.eigenVecs.data[jind-cMat.startpos];
 		
 
 		if(iproc==cMat.procno && jproc != cMat.procno){
-			//std::cout << "SENDRECV: " << iproc << " TO " << jproc << std::endl;
 			MPI_Sendrecv(&iRow,1,MPI_DOUBLE,jproc,0,&jRow,1,MPI_DOUBLE,jproc,0,
 					cMat.comm,MPI_STATUS_IGNORE);
 		}
 		if(jproc==cMat.procno&& iproc != cMat.procno){
-			//std::cout << "SENDRECV: " << jproc << " TO " << iproc << std::endl;
 			MPI_Sendrecv(&jRow,1,MPI_DOUBLE,iproc,0,&iRow,1,MPI_DOUBLE,iproc,0,
 					cMat.comm,MPI_STATUS_IGNORE);
 		}
@@ -409,7 +483,6 @@ void DistributedEigenSolver::jacobiRotate(DistributedMatrix & cMat, EigenData & 
 	
 	//cMat.printMatrix();
 
-	//if(cMat.procno==0)std::cout << "EIGENS DONE\n";
 	int diagrproc=cMat.i2proc(cMat.rc2i(maxr,maxr)), diagcproc=cMat.i2proc(cMat.rc2i(maxc,maxc)),
 	    maxvlproc=cMat.i2proc(maxvl.loc), maxvltproc=cMat.i2proc(cMat.rc2i(maxc,maxr));
 

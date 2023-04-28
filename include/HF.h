@@ -3,6 +3,7 @@
 #include "Matrix.h"
 #include "Atom.h"
 #include "Integrals.h"
+#include "DistributedMatrix.h"
 
 class HF{
 public:
@@ -31,6 +32,35 @@ private:
 
 	double eDiff;
 
+	double calculateENuc(Molecule & mol);
+	double calculateEElectron();
+
+	bool verbose;
+};
+
+class HFPar{
+public:
+	HFPar(DistributedMatrix & _S, DistributedMatrix & _X, DistributedMatrix & _cH, DistributedMatrix & ld);
+
+	double calculateEnergy(Molecule & mol, DistributedMatrix & P_init, int charge, bool verbose);
+
+	void HFStep();
+
+	void computeInteraction(DistributedMatrix & Pc);
+
+	DistributedMatrix computeNewDensity(DistributedMatrix & C);
+
+	void computeDensityDifference(DistributedMatrix & P_Old, DistributedMatrix & P_New);
+
+	double calculateEnergyTotal(Molecule & mol);
+
+private:
+	DistributedMatrix S, X, Xt, cH, F, P, eeList, eeInteract;
+
+	int dim;
+	int electroncount;
+
+	double eDiff;
 	double calculateENuc(Molecule & mol);
 	double calculateEElectron();
 

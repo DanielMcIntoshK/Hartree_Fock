@@ -6,6 +6,7 @@
 
 class DistributedMatrix{
 public:
+	DistributedMatrix():DistributedMatrix{MPI_COMM_WORLD}{}
 	DistributedMatrix(MPI_Comm cm);
 	DistributedMatrix(int r, int c, MPI_Comm cm);
 
@@ -17,6 +18,10 @@ public:
 	static DistributedMatrix matMul(DistributedMatrix & m1, DistributedMatrix & m2);
 	static DistributedMatrix diag(std::vector<double> eigenvals);
 	static DistributedMatrix matAdd(DistributedMatrix & m1, DistributedMatrix & m2);
+
+	void sort(std::vector<int> sortvals);
+
+	std::vector<double> gatherMat();
 
 	DistributedMatrix transpose();
 	void identity();
