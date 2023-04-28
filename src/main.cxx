@@ -32,8 +32,8 @@ int main(int argc, char ** argv){
 	DistributedMatrix S=computeSMatrixPar(mol);
 	
 	if(verbose){
-	std::cout << "OVERLAP MATRIX\n";
-	S.printMatrix();
+		if(S.procno==0)std::cout << "OVERLAP MATRIX\n";
+		S.printMatrix();
 	}
 
 	DistributedEigenSolver des(S, 0.000001);
@@ -44,28 +44,28 @@ int main(int argc, char ** argv){
 		std::cout << "EIGEN VALS: ";
 		for(auto a: ded.eigenVals) std::cout << a << " ";
 		std::cout << std::endl;
-	}
-	ded.eigenVecs.printMatrix();
+		}
+		ded.eigenVecs.printMatrix();
 	}
 
 	for(int i = 0; i < ded.eigenVals.size(); i++){
 		ded.eigenVals[i]=1/std::sqrt(ded.eigenVals[i]);
 	}
-	DistributedMatrix diag=DistributedMatrix::diag(ded.eigenVals);
+	/*DistributedMatrix diag=DistributedMatrix::diag(ded.eigenVals);
 	DistributedMatrix X=DistributedMatrix::matMul(ded.eigenVecs,diag);
 
 	if(verbose){
-		std::cout << "\nTRANSFORM MATRIX:\n";
+		if(X.procno==0)std::cout << "\nTRANSFORM MATRIX:\n";
 		X.printMatrix();
-		std::cout << std::endl;
-	}
+		if(X.procno==0)std::cout << std::endl;
+	}*/
 
 	DistributedMatrix cH=computeCoreHamiltonianMatrixPar(mol);
 
 	if(verbose){
-	std::cout << "CORE HAMILTONIAN\n";
+	if(cH.procno==0)std::cout << "CORE HAMILTONIAN\n";
 	cH.printMatrix();
-	std::cout << std::endl;
+	if(cH.procno==0)std::cout << std::endl;
 	}
 
 	DistributedMatrix ld=computeEEMatriciesPar(mol);

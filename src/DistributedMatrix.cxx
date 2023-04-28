@@ -272,6 +272,7 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 	DistributedMatrix cMat=oMat;
 	EigenData ed(oMat.rows,oMat.comm);
 
+
 	ed.eigenVecs.identity();
 	for(int i = 0; i < ed.eigenVals.size(); i++) ed.eigenVals[i]=0.0;
 
@@ -280,18 +281,19 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 
 	findMaxUpperTriangle(cMat);
 	do{
-		if(cMat.procno==0){
-			std::cout << citer << std::endl;
-		}
+		//if(cMat.procno==0){
+		//	std::cout << citer << std::endl;
+		//}
 		jacobiRotate(cMat, ed);
 		findMaxUpperTriangle(cMat);
-		MPI_Barrier(cMat.comm);
 		citer++;
-	}while(std::fabs(maxvl.val)>threshold && citer < maxiter);
-	//cMat.printMatrix();
+	}while(citer!=33&&std::fabs(maxvl.val)>threshold && citer < maxiter);
+	return ed;	
+//cMat.printMatrix();
 	std::cout << "GOT OUT " << maxvl.val << " " << threshold  << std::endl;
-	//if(citer==maxiter) std::cout << "TIMEOUT\n";
-	/*for(int n = 0; n < cMat.rows; n++){
+	if(citer==maxiter) std::cout << "TIMEOUT\n";
+	for(int n = 0; n < cMat.rows; n++){
+		std::cout << "SIZE: " << n << " " << ed.eigenVals.size() << std::endl;
 		int nnproc=cMat.i2proc(cMat.rc2i(n,n));
 		
 		double diagval=0.0;
@@ -299,8 +301,8 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 		MPI_Bcast(&diagval,1,MPI_DOUBLE,nnproc,cMat.comm);
 
 		ed.eigenVals[n]=diagval;
-	}*/
-	//ed.eigenVecs=ed.eigenVecs.transpose();
+	}
+	ed.eigenVecs=ed.eigenVecs.transpose();
 	return ed;
 }
 
@@ -397,7 +399,7 @@ void DistributedEigenSolver::jacobiRotate(DistributedMatrix & cMat, EigenData & 
 	
 	//cMat.printMatrix();
 
-	if(cMat.procno==0)std::cout << "EIGENS DONE\n";
+	//if(cMat.procno==0)std::cout << "EIGENS DONE\n";
 	int diagrproc=cMat.i2proc(cMat.rc2i(maxr,maxr)), diagcproc=cMat.i2proc(cMat.rc2i(maxc,maxc)),
 	    maxvlproc=cMat.i2proc(maxvl.loc), maxvltproc=cMat.i2proc(cMat.rc2i(maxc,maxr));
 
@@ -405,11 +407,12 @@ void DistributedEigenSolver::jacobiRotate(DistributedMatrix & cMat, EigenData & 
 	if(diagcproc==cMat.procno) cMat.data[cMat.rc2i(maxc,maxc)-cMat.startpos]=s*s*diagr+2.0*s*c*maxvl.val+c*c*diagc;
 	if(maxvlproc==cMat.procno) cMat.data[cMat.rc2i(maxr,maxc)-cMat.startpos]=0.0;
 	if(maxvltproc==cMat.procno) cMat.data[cMat.rc2i(maxc,maxr)-cMat.startpos]=0.0;
-
+	
+	
 	for(int l = 0; l < cMat.rows; l++){
 		if(l!=maxr && l != maxc){
 			int rlproc=cMat.i2proc(cMat.rc2i(maxr,l)), lrproc=cMat.i2proc(cMat.rc2i(l,maxr)),
-			    clproc=cMat.i2proc(cMat.rc2i(maxc,l)), lcproc=cMat.i2proc(cMat.rc2i(l,maxr));
+			    clproc=cMat.i2proc(cMat.rc2i(maxc,l)), lcproc=cMat.i2proc(cMat.rc2i(l,maxc));
 			
 			double eigenil, eigenjk;
 			if(cMat.procno==rlproc) eigenil=cMat.data[cMat.rc2i(maxr,l)-cMat.startpos];
