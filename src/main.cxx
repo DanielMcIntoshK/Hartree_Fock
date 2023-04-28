@@ -27,74 +27,49 @@ int main(int argc, char ** argv){
 	std::cout << "MOLECULE: " << mol.orbitalcount << std::endl;
 	mol.printMol();
 
-	bool verbose=false;
+	bool verbose=true;
 
-	Matrix S=computeSMatrix(mol);
+	DistributedMatrix S=computeSMatrixPar(mol);
 	
-	DistributedMatrix dm(S.rows, S.cols, wcomm);
-
-	for(int i = 0; i < dm.data.size(); i++){
-		int index = i+dm.startpos;
-		int gr = dm.i2r(index);
-		int gc = dm.i2c(index);
-
-		dm.data[i]=S(gr,gc);
+	if(verbose){
+	std::cout << "OVERLAP MATRIX\n";
+	S.printMatrix();
 	}
 
-	dm.printMatrix();
-
-	EigenSolver no(S,0.000001);
-	if(dm.procno==0){
-		std::cout <<"SERIALEIGEN\n"<<std::endl;
-		EigenSolver::EigenData nod=no.calculateEigens();
-		std::cout << "DONE\n";
-	}
-	MPI_Barrier(wcomm);
-
-	DistributedEigenSolver des(dm, 0.000001);
+	DistributedEigenSolver des(S, 0.000001);
 	DistributedEigenSolver::EigenData ded = des.calculateEigens();
 
-	if(dm.procno==0){
+	if(verbose){
+	if(S.procno==0){
 		std::cout << "EIGEN VALS: ";
 		for(auto a: ded.eigenVals) std::cout << a << " ";
 		std::cout << std::endl;
 	}
 	ded.eigenVecs.printMatrix();
-	
-	MPI_Barrier(wcomm);
-
-	MPI_Finalize();
-
-	return 0;
-
-
-
-	if(verbose){
-	std::cout << "S MATRIX:\n";
-	S.printMatrix();
 	}
 
-	Matrix cH=computeCoreHamiltonianMatrix(mol);
+	for(int i = 0; i < ded.eigenVals.size(); i++){
+		ded.eigenVals[i]=1/std::sqrt(ded.eigenVals[i]);
+	}
+	DistributedMatrix diag=DistributedMatrix::diag(ded.eigenVals);
+	DistributedMatrix X=DistributedMatrix::matMul(ded.eigenVecs,diag);
+
+	if(verbose){
+		std::cout << "\nTRANSFORM MATRIX:\n";
+		X.printMatrix();
+		std::cout << std::endl;
+	}
+
+	DistributedMatrix cH=computeCoreHamiltonianMatrixPar(mol);
 
 	if(verbose){
 	std::cout << "CORE HAMILTONIAN\n";
 	cH.printMatrix();
+	std::cout << std::endl;
 	}
 
-	list4D ld=computeEEMatricies(mol);
+	DistributedMatrix ld=computeEEMatriciesPar(mol);
 	
-
-	for(int i = 0; i < ld.size(); i++){
-	for(int j = 0; j < ld[i].size(); j++){
-	for(int k = 0; k < ld[i][j].size(); k++){
-	for(int l = 0; l < ld[i][j][k].size();l++){
-		if(std::isnan(ld[i][j][k][l])){
-			std::cout << "NAN: " << i << " " << j << " " << k << " " << l << std::endl;
-		}	
-	}}}}
-
-	EigenSolver es(S, 0.000001);
-	EigenSolver::EigenData ed = es.calculateEigens();
 
 	/*
 	std::vector<int> sl{0,3,1,4,2,5,6};
@@ -120,12 +95,12 @@ int main(int argc, char ** argv){
 	ed.eigenVecs.printMatrix();
 	std::cout << std::endl;
 	*/
-	Matrix diag=Matrix::diag(ed.eigenVals);
+	//Matrix diag=Matrix::diag(ed.eigenVals);
 	//Matrix eigenVecinv=ed.eigenVecs.transpose();
 
 	//Matrix temp=Matrix::matMul(diag,eigenVecinv);
-	Matrix X = Matrix::matMul(ed.eigenVecs,diag);
-	if(verbose){
+	//Matrix X = Matrix::matMul(ed.eigenVecs,diag);
+	/*if(verbose){
 	std::cout << std::endl;
 	std::cout << "TRANSFORM MATRIX\n";
 	X.printMatrix();
@@ -139,11 +114,16 @@ int main(int argc, char ** argv){
 	std::cout << "COMBINED TEST\n";
 	com.printMatrix();
 	}
+	*/
+
+	MPI_Finalize();
+
+	return 0;
 
 	Matrix P_init(S.rows,S.cols);
 
-	HF hartreefockSolver(S,X,cH,ld);
-	hartreefockSolver.calculateEnergy(mol,P_init,0,verbose);
+	//HF hartreefockSolver(S,X,cH,ld);
+	//hartreefockSolver.calculateEnergy(mol,P_init,0,verbose);
 
 	return 0;
 }

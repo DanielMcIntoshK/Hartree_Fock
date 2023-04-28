@@ -309,3 +309,84 @@ list4D computeEEMatricies(Molecule &mol){
 	return ld;
 }
 
+DistributedMatrix computeSMatrixPar(Molecule & mol){
+	int dim = mol.orbitalcount;
+	DistributedMatrix dS (dim, dim,MPI_COMM_WORLD);
+
+	for (int i = 0; i < dS.data.size(); i++){
+		int index = i + dS.startpos;
+		int gr = dS.i2r(index);
+		int gc = dS.i2c(index);
+
+		dS.data[i]=overlap(mol.getOrbital(gr), mol.getOrbital(gc));
+	}
+	return dS;
+}
+
+DistributedMatrix computeKineticMatrixPar(Molecule & mol){
+	int dim = mol.orbitalcount;
+	DistributedMatrix kH(dim,dim,MPI_COMM_WORLD);
+
+	for(int i = 0; i < kH.data.size(); i++){
+		int index = i + kH.startpos;
+		int gr = kH.i2r(index);
+		int gc = kH.i2c(index);
+
+		kH.data[i]=kinetic(mol.getOrbital(gr),mol.getOrbital(gc));
+	}
+
+	return kH;
+}
+
+DistributedMatrix computeNuclearMatrixPar(Molecule & mol){
+	int dim = mol.orbitalcount;
+	DistributedMatrix nH(dim,dim,MPI_COMM_WORLD);
+
+	for(int a = 0; a < mol.atoms.size(); a++){
+		DistributedMatrix nnH(dim,dim,MPI_COMM_WORLD);
+		for(int i = 0; i < nnH.data.size(); i++){
+			int index = i + nnH.startpos;
+			int gr = nnH.i2r(index);
+			int gc = nnH.i2c(index);
+
+			nnH.data[i]=nuclear(mol.getOrbital(gr),mol.getOrbital(gc),mol.atoms[a]);
+		}
+		nH=DistributedMatrix::matAdd(nH,nnH);
+	}
+
+	return nH;
+}	
+
+DistributedMatrix computeCoreHamiltonianMatrixPar(Molecule & mol){
+	int dim = mol.orbitalcount;
+	MPI_Comm cm=MPI_COMM_WORLD;
+	DistributedMatrix cH(dim,dim,cm), kH(dim,dim,cm), nH(dim,dim,cm);
+
+	kH=computeKineticMatrixPar(mol);
+	nH=computeNuclearMatrixPar(mol);
+
+	cH=DistributedMatrix::matAdd(kH,nH);
+
+	return cH;
+}
+
+DistributedMatrix computeEEMatriciesPar(Molecule & mol){
+	int dim = mol.orbitalcount;
+	DistributedMatrix l4d(1,dim*dim*dim*dim,MPI_COMM_WORLD);
+
+	int eecount=0;
+
+	for(int p = 0; p < l4d.data.size(); p++){
+		int i,j,k,l;
+		i=(p/(dim*dim*dim))%dim;
+		j=(p/(dim*dim))%dim;
+		k=(p/dim)%dim;
+		l=p%dim;
+
+		double ev = electronic(mol.getOrbital(i), mol.getOrbital(j), mol.getOrbital(k), mol.getOrbital(l));
+
+		l4d.data[p]=ev;
+	}
+	return l4d;
+}
+

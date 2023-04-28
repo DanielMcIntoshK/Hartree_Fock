@@ -36,7 +36,7 @@ DistributedMatrix computeKineticMatrixPar(Molecule & mol);
 
 DistributedMatrix computeNuclearMatrixPar(Molecule & mol);
 
-DistributedMatrix computeCOreHamiltonianMatrixPar(Molecule & mol);
+DistributedMatrix computeCoreHamiltonianMatrixPar(Molecule & mol);
 
 DistributedMatrix computeEEMatriciesPar(Molecule&mol);
 
