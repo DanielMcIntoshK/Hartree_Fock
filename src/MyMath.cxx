@@ -21,6 +21,7 @@ double binom(double x, double y){
 	return tgamma(x+1)/(tgamma(y+1)*tgamma(x-y+1));
 }
 
+/*
 double gammaIncomplete(double a, double x, double t, bool verbose){
 	if(a/x < 0.1){ 
 		return tgamma(a);
@@ -31,6 +32,47 @@ double gammaIncomplete(double a, double x, double t, bool verbose){
 	double incomplete= ina*epow*hypergeometric(a,1+a,-x,t);
 
 	return incomplete;
+}
+*/
+
+double gammaIncompleteNew(double p, double x){
+	double a, arg, c, f, value;
+	double e = 1.0E-09, uflo=1.0E-37;
+
+	if(x<=0.0) {
+		std::cout << "GAMMA INCOMPLETE " << p << " " << x << std::endl;
+		return 0.0;
+	}
+	if(p<=0.0){ 
+		std::cout << "GAMMA INCOMPLETE " << p << " " << x << std::endl;
+		return 0.0;
+	}
+	
+	arg = p * std::log(x)-lgamma(p+1.0)-x;
+
+	if(arg<log(uflo)) return 0.0;
+
+	f=std::exp(arg);
+
+	if(f==0.0) {
+		std::cout << "GAMMA INCOMPLETE " << p << " " << x << std::endl;
+		
+		return 0.0;
+	}
+
+	c=1.0;
+	value=1.0;
+	a=p;
+
+	while(true){
+		a=a+1.0;
+		c=c*x/a;
+		value=value+c;
+
+		if(c<=e*value) break;
+	}
+
+	return value*f;
 }
 
 double hypergeometric(double a, double b, double z, double t){
@@ -67,7 +109,7 @@ double boysFunction(double nu, double x){
 		ff = 1.0/(2.0*nu+1.0)-x/(2.0*nu+3.0);
 	}
 	else {
-		ff=0.5/std::pow(x,nu+.5)*gammaIncomplete(nu+0.5,x,.001);
+		ff=0.5/std::pow(x,nu+.5)*tgamma(nu+0.5)*gammaIncompleteNew(nu+0.5,x);
 	}
 	return ff;
 

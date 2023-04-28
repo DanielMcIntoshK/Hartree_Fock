@@ -2,6 +2,7 @@
 #define ATOM__H_
 #include <vector>
 #include <string>
+#include <map>
 
 struct pg{
 	pg():a{0.0},c{0.0}{}
@@ -52,6 +53,7 @@ public:
 	std::string getName() {return namelist[atnum-1];}
 
 	static std::vector<std::string> namelist;
+	static std::vector<std::string> atabrev;
 private:
 	std::vector<Orbital> constructOrbitals(char type);
 };
@@ -62,8 +64,13 @@ struct Molecule{
 
 	int orbitalcount;
 
+	void loadMolecule(std::string fileName);
 	void init(std::string bset);
 	Orbital& getOrbital(int n);
+
+	void printMol();
+
+	std::string strip(std::string & str);
 };
 
 #endif

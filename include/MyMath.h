@@ -9,7 +9,9 @@ int comb(int i, int j);
 
 double binom(double x, double y);
 
-double gammaIncomplete(double a, double x,double t,bool v=false);
+//double gammaIncomplete(double a, double x,double t,bool v=false);
+
+double gammaIncompleteNew(double x, double p);
 
 double hypergeometric(double a, double b, double z, double t);
 

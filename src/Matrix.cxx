@@ -151,12 +151,16 @@ EigenSolver::EigenData EigenSolver::calculateEigens(){
 
 	findMaxUpperTriangle(cMat);
 	do{
+		std::cout << citer << std::endl;
 		jacobiRotate(cMat, ed);
 		findMaxUpperTriangle(cMat);
 		citer++;
 	}while(std::fabs(cMat(maxr,maxc))>threshold && citer < maxiter);
 	if(citer==maxiter) std::cout << "TIMEOUT\n";
 	for(int n = 0; n < cMat.rows; n++) ed.eigenVals[n]=cMat(n,n);
+	std::cout << "EIGENVALS: ";
+	for(auto a: ed.eigenVals) std::cout << a << " ";
+	std::cout << std::endl;
 	ed.eigenVecs=ed.eigenVecs.transpose();
 	return ed;
 }
@@ -179,6 +183,8 @@ void EigenSolver::findMaxUpperTriangle(Matrix & cMat){
 void EigenSolver::jacobiRotate(Matrix & cMat, EigenSolver::EigenData & ed){
 	double c, s;
 
+	std::cout << maxr << " " << maxc << " " << cMat(maxr,maxc) << std::endl;
+
 	if(cMat(maxc,maxr) != 0.0){
 		double tau, t;
 		tau = (cMat(maxc,maxc)-cMat(maxr,maxr)) / (2.0 * cMat(maxc,maxr));
@@ -196,6 +202,7 @@ void EigenSolver::jacobiRotate(Matrix & cMat, EigenSolver::EigenData & ed){
 		s=0.0;
 	}
 
+
 	std::vector<double> eigenVecsIRow,eigenVecsJRow;
 	eigenVecsIRow.resize(cMat.rows);
 	eigenVecsJRow.resize(cMat.rows);
@@ -212,6 +219,8 @@ void EigenSolver::jacobiRotate(Matrix & cMat, EigenSolver::EigenData & ed){
 	double eigen_jj=cMat(maxc,maxc);
 	double eigen_il, eigen_jk;
 
+	cMat.printMatrix();
+
 	cMat.setElement(maxr,maxr,c*c*eigen_ii-2.0*s*c*cMat(maxr,maxc)+s*s*eigen_jj);
 	cMat.setElement(maxc,maxc,s*s*eigen_ii+2.0*s*c*cMat(maxr,maxc)+c*c*eigen_jj);
 	cMat.setElement(maxr,maxc,0.0);
@@ -222,6 +231,8 @@ void EigenSolver::jacobiRotate(Matrix & cMat, EigenSolver::EigenData & ed){
 			eigen_il=cMat(maxr,l);
 			eigen_jk=cMat(maxc,l);
 
+			//std::cout << eigen_il << " " << eigen_jk << std::endl;
+
 			cMat.setElement(maxr,l,c*eigen_il-s*eigen_jk);
 			cMat.setElement(l,maxr,cMat(maxr,l));
 
@@ -229,4 +240,5 @@ void EigenSolver::jacobiRotate(Matrix & cMat, EigenSolver::EigenData & ed){
 			cMat.setElement(l,maxc,cMat(maxc,l));
 		}
 	}
+	cMat.printMatrix();
 }

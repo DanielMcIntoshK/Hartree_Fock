@@ -2,6 +2,7 @@
 #define INTEGRALS__H_
 #include "Atom.h"
 #include "Matrix.h"
+#include "DistributedMatrix.h"
 
 typedef std::vector<std::vector<std::vector<std::vector<double>>>> list4D;
 
@@ -28,6 +29,16 @@ Matrix computeNuclearMatrix(Molecule &mol);
 Matrix computeCoreHamiltonianMatrix(Molecule &mol);
 
 list4D computeEEMatricies(Molecule &mol);
+
+DistributedMatrix computeSMatrixPar(Molecule &mol);
+
+DistributedMatrix computeKineticMatrixPar(Molecule & mol);
+
+DistributedMatrix computeNuclearMatrixPar(Molecule & mol);
+
+DistributedMatrix computeCOreHamiltonianMatrixPar(Molecule & mol);
+
+DistributedMatrix computeEEMatriciesPar(Molecule&mol);
 
 #endif
 

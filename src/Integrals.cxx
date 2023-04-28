@@ -247,8 +247,8 @@ Matrix computeNuclearMatrix(Molecule & mol){
 				AtomMat.setElement(r,c,nuclear(mol.getOrbital(r),mol.getOrbital(c),mol.atoms[a]));
 			}
 		}
-		std::cout << "NUCLEAR MATRIX " << mol.atoms[a].getName() << ":\n";
-		AtomMat.printMatrix();
+		//std::cout << "NUCLEAR MATRIX " << mol.atoms[a].getName() << ":\n";
+		//AtomMat.printMatrix();
 		N=Matrix::matAdd(N,AtomMat);
 	}
 
@@ -259,17 +259,17 @@ Matrix computeNuclearMatrix(Molecule & mol){
 Matrix computeCoreHamiltonianMatrix(Molecule & mol){
 	int dim=mol.orbitalcount;
 	Matrix Hc(dim,dim), K(dim,dim), N(dim,dim);
-	std::cout << "COMPUTEING CORE HAMILTONIAN\n";
+	//std::cout << "COMPUTEING CORE HAMILTONIAN\n";
 	
 	K=computeKineticMatrix(mol);
 
-	std::cout << "Kinetic Matrix:\n";
-	K.printMatrix();
+	//std::cout << "Kinetic Matrix:\n";
+	//K.printMatrix();
 
 	N=computeNuclearMatrix(mol);
 	
-	std::cout << "Nuclear Matrix:\n";
-	N.printMatrix();
+	//std::cout << "Nuclear Matrix:\n";
+	//N.printMatrix();
 
 	Hc=Matrix::matAdd(K,N);
 
@@ -290,6 +290,7 @@ list4D computeEEMatricies(Molecule &mol){
 		}
 	}
 
+	int eecount=0;
 	for(int i = 0; i < dim; i++){
 	for(int j = 0; j < dim; j++){
 	for(int k = 0; k < dim; k++){
@@ -299,6 +300,10 @@ list4D computeEEMatricies(Molecule &mol){
 		//std::cout << "("<<i+1 <<","<<j+1<<","<<k+1<<","<<l+1<<")"<<"  " << ev << std::endl; 
 
 		ld[i][j][k][l]=ev;
+		eecount++;
+		if((eecount%5000)==0){
+			std::cout << "COMPUTED: " << eecount<< " OF " << dim*dim*dim*dim << std::endl; 
+		}
 		
 	}}}}
 	return ld;
