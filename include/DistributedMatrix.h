@@ -3,10 +3,6 @@
 #include <mpi.h>
 #include <vector>
 
-struct valloc{
-	double val;
-	int loc;
-};
 
 class DistributedMatrix{
 public:
@@ -46,6 +42,10 @@ public:
 		EigenData(int s, MPI_Comm cm):eigenVecs{s,s,cm}{eigenVals.resize(s);}
 		DistributedMatrix eigenVecs;
 		std::vector<double> eigenVals;
+	};
+	struct valloc{
+		double val;
+		int loc;
 	};
 
 	DistributedEigenSolver(DistributedMatrix & inMat, double _t);

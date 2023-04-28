@@ -191,7 +191,7 @@ DistributedMatrix DistributedMatrix::transpose(){
 		for(int j = i; j < tm.cols; j++){
 			int index=rc2i(i,j), tindex=rc2i(j,i);
 			int dtproc=i2proc(index), tdtproc=i2proc(tindex);
-			if(i==j) tm.data[index-startpos]=data[index-startpos];
+			if(i==j&&procno==dtproc) tm.data[index-startpos]=data[index-startpos];
 			else if(tm.procno==dtproc && tm.procno==tdtproc){
 				tm.data[index-startpos]=data[tindex-startpos];
 				tm.data[tindex-startpos]=data[index-startpos];
@@ -312,7 +312,7 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 
 		ed.eigenVals[n]=diagval;
 	}
-	//ed.eigenVecs=ed.eigenVecs.transpose();
+	ed.eigenVecs=ed.eigenVecs.transpose();
 	return ed;
 }
 
