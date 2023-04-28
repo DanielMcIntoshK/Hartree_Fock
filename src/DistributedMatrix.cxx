@@ -187,16 +187,28 @@ DistributedMatrix DistributedMatrix::matAdd(DistributedMatrix &m1, DistributedMa
 
 DistributedMatrix DistributedMatrix::transpose(){
 	DistributedMatrix tm(rows,cols,comm);
-	for(int i = 0; i < data.size();i++){
-		int gpos=i+startpos;
-		int gr=i2r(gpos);
-		int gc=i2c(gpos);
+	for(int i = 0; i < tm.rows; i++){
+		for(int j = i; j < tm.cols; j++){
+			int index=rc2i(i,j), tindex=rc2i(j,i);
+			int dtproc=i2proc(index), tdtproc=i2proc(tindex);
+			if(i==j) tm.data[index-startpos]=data[index-startpos];
+			else if(tm.procno==dtproc && tm.procno==tdtproc){
+				tm.data[index-startpos]=data[tindex-startpos];
+				tm.data[tindex-startpos]=data[index-startpos];
+			}
+			else if(tm.procno==dtproc){
+				double holder = 0.0;
+				MPI_Sendrecv(&data[index-startpos], 1, MPI_DOUBLE, tdtproc,0,&holder,
+						1,MPI_DOUBLE,tdtproc,0,tm.comm,MPI_STATUS_IGNORE);
+				tm.data[index-startpos]=holder;
+			}
+			else if(tm.procno==tdtproc){
+				double holder = 0.0;
+				MPI_Sendrecv(&data[tindex-startpos], 1, MPI_DOUBLE, dtproc,0,&holder,
+						1,MPI_DOUBLE,dtproc,0,tm.comm,MPI_STATUS_IGNORE);
+				tm.data[tindex-startpos]=holder;
+			}
 
-		if(gr==gc) tm.data[i]=data[i];
-		else{
-			int transposePartner=i2proc(rc2i(gc,gr));
-			MPI_Sendrecv(&(data[i]),1,MPI_DOUBLE, transposePartner, 0,&(tm.data[i]),1,MPI_DOUBLE,
-					transposePartner, 0, comm, MPI_STATUS_IGNORE);
 		}
 	}
 	return tm;
@@ -281,19 +293,17 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 
 	findMaxUpperTriangle(cMat);
 	do{
-		//if(cMat.procno==0){
-		//	std::cout << citer << std::endl;
-		//}
+		if(cMat.procno==0){
+			std::cout << citer << std::endl;
+		}
 		jacobiRotate(cMat, ed);
 		findMaxUpperTriangle(cMat);
 		citer++;
-	}while(citer!=33&&std::fabs(maxvl.val)>threshold && citer < maxiter);
-	return ed;	
+	}while(std::fabs(maxvl.val)>threshold && citer < maxiter);
 //cMat.printMatrix();
-	std::cout << "GOT OUT " << maxvl.val << " " << threshold  << std::endl;
-	if(citer==maxiter) std::cout << "TIMEOUT\n";
+	//std::cout << "GOT OUT " << maxvl.val << " " << threshold  << std::endl;
+	if(citer==maxiter&&oMat.procno==0) std::cout << "TIMEOUT\n";
 	for(int n = 0; n < cMat.rows; n++){
-		std::cout << "SIZE: " << n << " " << ed.eigenVals.size() << std::endl;
 		int nnproc=cMat.i2proc(cMat.rc2i(n,n));
 		
 		double diagval=0.0;
@@ -302,7 +312,7 @@ DistributedEigenSolver::EigenData DistributedEigenSolver::calculateEigens(){
 
 		ed.eigenVals[n]=diagval;
 	}
-	ed.eigenVecs=ed.eigenVecs.transpose();
+	//ed.eigenVecs=ed.eigenVecs.transpose();
 	return ed;
 }
 

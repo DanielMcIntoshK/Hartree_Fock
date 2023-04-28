@@ -46,19 +46,33 @@ int main(int argc, char ** argv){
 		std::cout << std::endl;
 		}
 		ded.eigenVecs.printMatrix();
+		DistributedMatrix t=ded.eigenVecs.transpose();
+		t.printMatrix();
 	}
 
 	for(int i = 0; i < ded.eigenVals.size(); i++){
 		ded.eigenVals[i]=1/std::sqrt(ded.eigenVals[i]);
 	}
-	/*DistributedMatrix diag=DistributedMatrix::diag(ded.eigenVals);
-	DistributedMatrix X=DistributedMatrix::matMul(ded.eigenVecs,diag);
+	DistributedMatrix diag=DistributedMatrix::diag(ded.eigenVals);
+	diag.printMatrix();
+	
+	
+	//DistributedMatrix X=DistributedMatrix::matMul(ded.eigenVecs,diag);
+	//DistributedMatrix Xt=X.transpose();
+	//Xt.printMatrix();
 
+	/*
 	if(verbose){
 		if(X.procno==0)std::cout << "\nTRANSFORM MATRIX:\n";
 		X.printMatrix();
 		if(X.procno==0)std::cout << std::endl;
-	}*/
+	}
+	*/
+
+	//DistributedMatrix test = DistributedMatrix::matMul(Xt,S);
+	//test=DistributedMatrix::matMul(test,X);
+	//if(test.procno==0)std::cout << "TEST SHOULD BE IDENT\n";
+	//test.printMatrix();
 
 	DistributedMatrix cH=computeCoreHamiltonianMatrixPar(mol);
 
