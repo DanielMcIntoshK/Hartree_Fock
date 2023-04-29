@@ -29,6 +29,8 @@ int main(int argc, char ** argv){
 		mol.printMol();
 	}
 
+	double ti=MPI_Wtime();
+
 	bool verbose=false;
 
 	DistributedMatrix S=computeSMatrixPar(mol);
@@ -36,10 +38,13 @@ int main(int argc, char ** argv){
 		if(S.procno==0)std::cout << "OVERLAP MATRIX\n";
 		S.printMatrix();
 	}
+	double ot=MPI_Wtime();
 
 	DistributedEigenSolver des(S, 0.000000001);
 	DistributedEigenSolver::EigenData ded = des.calculateEigens();
 	
+	double eigt=MPI_Wtime();
+
 	if(verbose){
 	if(S.procno==0){
 		std::cout << "EIGEN VALS: ";
@@ -62,9 +67,11 @@ int main(int argc, char ** argv){
 		X.printMatrix();
 		if(X.procno==0)std::cout << std::endl;
 	}
-
+	double prehamt=MPI_Wtime();
 
 	DistributedMatrix cH=computeCoreHamiltonianMatrixPar(mol);
+
+	double posthamt=MPI_Wtime();
 
 	if(verbose){
 	if(cH.procno==0)std::cout << "CORE HAMILTONIAN\n";
@@ -75,10 +82,23 @@ int main(int argc, char ** argv){
 	DistributedMatrix ld=computeEEMatriciesPar(mol);
 	std::vector<double> ldMat=ld.gatherMat();
 
+	double eecomputet=MPI_Wtime();
+
 	DistributedMatrix P_init(S.rows,S.cols,MPI_COMM_WORLD);
 
 	HFPar hartreefockSolver(S,X,cH,ld,ldMat);
 	hartreefockSolver.calculateEnergy(mol,P_init,0,verbose);
+
+	double end=MPI_Wtime();
+
+	if(procno==0){
+		std::cout << "Program exited after " << end-ti << " seconds.\n";
+		std::cout <<"*******\n"<<"OVERALAP MATRIX: " << ot-ti << std::endl <<
+			"Eigenvec algorithm: " << eigt-ot << std::endl <<
+			"Core Hamiltonian: " << posthamt-prehamt<<std::endl <<
+			"EE integral list: " << eecomputet-posthamt << std::endl <<
+			"SCF Converge: " << end-eecomputet << std::endl;
+	}
 
 	MPI_Finalize();
 

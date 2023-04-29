@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH -J HW1_Data_Collection
+#SBATCH -o output.%j
+#SBATCH -e error.%j
+#SBATCH -N 1 -n 52
+#SBATCH -p normal
+#SBATCH -t 1:00:00
+#SBATCH -A DMS20016
+
+for i in 1 2 4 8 16 24
+do
+	ibrun -n $i bin/hartreefock > scriptResults/hf$i
+done
+
