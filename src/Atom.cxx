@@ -134,7 +134,7 @@ void Molecule::loadMolecule(std::string fileName){
 	std::string input;
 	std::getline(inFile, input);
 	int atomCount=std::stoi(input);
-	std::cout << atomCount << std::endl;
+	//std::cout << atomCount << std::endl;
 	std::getline(inFile, input);
 	for(int i = 0; i < atomCount; i++){
 		std::getline(inFile,input);

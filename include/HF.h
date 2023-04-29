@@ -40,13 +40,15 @@ private:
 
 class HFPar{
 public:
-	HFPar(DistributedMatrix & _S, DistributedMatrix & _X, DistributedMatrix & _cH, DistributedMatrix & ld);
+	HFPar(DistributedMatrix & _S, DistributedMatrix & _X, DistributedMatrix & _cH, DistributedMatrix & ld,
+			std::vector<double> _eeListS);
 
 	double calculateEnergy(Molecule & mol, DistributedMatrix & P_init, int charge, bool verbose);
 
 	void HFStep();
 
 	void computeInteraction(DistributedMatrix & Pc);
+	void computeInteractionStatic(DistributedMatrix &Pc);
 
 	DistributedMatrix computeNewDensity(DistributedMatrix & C);
 
@@ -56,6 +58,8 @@ public:
 
 private:
 	DistributedMatrix S, X, Xt, cH, F, P, eeList, eeInteract;
+
+	std::vector<double> eeListS;
 
 	int dim;
 	int electroncount;

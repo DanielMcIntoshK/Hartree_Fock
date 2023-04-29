@@ -3,7 +3,7 @@
 #include <cmath>
 
 HFPar::HFPar(DistributedMatrix & _S, DistributedMatrix & _X, DistributedMatrix & _cH,
-		DistributedMatrix & ld):S{_S},X{_X},cH{_cH},eeList{ld}{
+		DistributedMatrix & ld,std::vector<double> _eeL):S{_S},X{_X},cH{_cH},eeList{ld},eeListS{_eeL}{
 	F=DistributedMatrix(S.rows,S.cols,S.comm);
 	P=DistributedMatrix(S.rows,S.cols,S.comm);
 	Xt=X.transpose();
@@ -24,7 +24,7 @@ double HFPar::calculateEnergy(Molecule & mol, DistributedMatrix & P_init, int ch
 	}
 	electroncount-=charge;
 
-	if(S.procno==0)std::cout << "ELECTRONS: " << electroncount<<std::endl;
+	if(S.procno==0&&verbose)std::cout << "ELECTRONS: " << electroncount<<std::endl;
 
 	dim = mol.orbitalcount;
 
@@ -38,72 +38,34 @@ double HFPar::calculateEnergy(Molecule & mol, DistributedMatrix & P_init, int ch
 		double totalE = calculateEnergyTotal(mol);
 		if(S.procno==0) std::cout << "ENERGY DIFF: " << eDiff << std::endl << "TOTAL ENERGY: " << totalE << std::endl;
 	}while(eDiff > 1.0E-12 && stepCount < 10000);
+	if(S.procno==0){
 	if(stepCount>=10000) std::cout << "\nSCF DID NOT CONVERGE\n";
 	else std::cout << "\nSCF CONVERGED\n";
-
+	}
 	return calculateEnergyTotal(mol);
 }
 
 void HFPar::HFStep(){
 	
-	if(S.procno==0){
-		std::cout << "COMPUTING INTERACTION\n";
-	}
-	P.printMatrix();
-
-	computeInteraction(P);
+	//computeInteraction(P);
+	computeInteractionStatic(P);
 	
-	if(S.procno==0){
-		std::cout << "COMPUTING FOCK MATRIX\n";
-	}
 	F=DistributedMatrix::matAdd(cH,eeInteract);
-	if(S.procno==0)std::cout << "EEINTERACT\n";
-	eeInteract.printMatrix();
-	F.printMatrix();
-	if(S.procno==0){
-		std::cout << "Transforming FOCK To ORTHOGANAL BASIS SET\n";
-	}
 
 	DistributedMatrix Fx = DistributedMatrix::matMul(Xt,F);
 	Fx=DistributedMatrix::matMul(Fx,X);
-	if(S.procno==0){
-		std::cout << "Solving EigenVecs of Fock\n";
-	}
-
-	Fx.printMatrix();
 
 	DistributedEigenSolver es(Fx,0.000001);
 	DistributedEigenSolver::EigenData ed = es.calculateEigens();
-	if(S.procno==0){
-		std::cout << "EGENVALS: ";
-		for(auto a: ed.eigenVals) std::cout << a << " ";
-		std::cout << std::endl<<"EIGENVECS: \n";
-	}
-	ed.eigenVecs.printMatrix();
-	if(S.procno==0){
-		std::cout << "Sorting EigenVecs\n";
-	}
-
+	
 	
 	std::vector<int> sl=sortlist(ed.eigenVals);
 	ed.eigenVecs.sort(sl);
-	if(S.procno==0){
-		std::cout << "Calculating C\n SORTED\n";
-	}
-	ed.eigenVecs.printMatrix();
 	
 	
 	DistributedMatrix C = DistributedMatrix::matMul(X,ed.eigenVecs);
-	if(S.procno==0){
-		std::cout << "Computing New Density\n";
-	}
-	C.printMatrix();
 	
 	DistributedMatrix P_New=computeNewDensity(C);
-	if(S.procno==0){
-		std::cout << "Computing Density Difference\n";
-	}
-	P_New.printMatrix();
 
 	computeDensityDifference(P,P_New);
 
@@ -121,15 +83,15 @@ void HFPar::computeInteraction(DistributedMatrix & Pc){
 			for(int k = 0; k < dim; k++){
 				for(int l = 0; l < dim;l++){
 					int indexij=i*dim*dim*dim+j*dim*dim+k*dim+l;
-					int indexil=i*dim*dim*dim+l*dim*dim+k*dim+l;
+					int indexil=i*dim*dim*dim+l*dim*dim+k*dim+j;
 					
 					int indexkl=Pc.rc2i(k,l);
 
 					int ijproc=eeList.i2proc(indexij),
-					    ilproc=eeList.i2proc(indexij),
+					    ilproc=eeList.i2proc(indexil),
 					    klproc=Pc.i2proc(indexkl);
 
-					double ijval, ilval, klval;
+					double ijval=0.0, ilval=0.0, klval=0.0;
 					
 					if(procno==ijproc){
 						ijval=eeList.data[indexij-eeList.startpos];
@@ -164,13 +126,45 @@ void HFPar::computeInteraction(DistributedMatrix & Pc){
 								MPI_STATUS_IGNORE);
 					}
 					
-					if(procno==dataproc)sub+=klval*(ijval-0.5*ilval);
+					if(procno==dataproc){
+						sub+=klval*(ijval-0.5*ilval);
+					}
 					
 				}
 			}
-			if(eeInteract.procno==dataproc) eeInteract.data[eeInteract.rc2i(i,j)-eeInteract.startpos]=sub;
+			if(eeInteract.procno==dataproc) {
+				eeInteract.data[eeInteract.rc2i(i,j)-eeInteract.startpos]=sub;
+
+			}
 		}
 	}
+}
+
+void HFPar::computeInteractionStatic(DistributedMatrix &Pc){
+	eeInteract=DistributedMatrix(dim,dim,Pc.comm);
+	std::vector<double> pcData=Pc.gatherMat();
+	int procno=Pc.procno;
+	for(int i = 0; i < dim; i++){
+		for(int j = 0; j < dim; j++){
+			double sub=0.0;
+			for(int k = 0; k < dim; k++){
+			for(int l = 0; l < dim; l++){
+				long ij=i*dim*dim*dim+j*dim*dim+k*dim+l;
+				long il=i*dim*dim*dim+l*dim*dim+k*dim+j;
+				int kl=Pc.rc2i(k,l);
+				
+				double ijval=eeListS[ij], ilval=eeListS[il];
+			        double	klval=pcData[kl];
+
+				sub+=klval*(ijval-0.5*ilval);	
+			}
+			}
+			if(procno==Pc.i2proc(Pc.rc2i(i,j))){
+				eeInteract.data[eeInteract.rc2i(i,j)-eeInteract.startpos]=sub;
+			}
+		}
+	}
+
 }
 
 DistributedMatrix HFPar::computeNewDensity(DistributedMatrix & C){
@@ -228,7 +222,7 @@ void HFPar::computeDensityDifference(DistributedMatrix & P_Old, DistributedMatri
 	}
 	MPI_Allreduce(&delta,&eDiff,1,MPI_DOUBLE,MPI_SUM,P_Old.comm);
 
-	eDiff=std::sqrt(eDiff);
+	eDiff=std::sqrt(eDiff/4.0);
 }
 
 double HFPar::calculateEnergyTotal(Molecule & mol){

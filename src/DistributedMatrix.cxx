@@ -308,7 +308,7 @@ void DistributedMatrix::printMatrix(){
 }
 std::vector<double> DistributedMatrix::gatherMat(){
 	std::vector<double> fullMat;
-	if(procno==0) fullMat.resize(size);
+	fullMat.resize(size);
 
 	std::vector<int> recvcount, displace;
 	recvcount.resize(nprocs);
@@ -342,8 +342,8 @@ std::vector<double> DistributedMatrix::gatherMat(){
 	std::cout << std::endl;
 	}
 
-	MPI_Gatherv(data.data(),blocksize,MPI_DOUBLE,fullMat.data(),recvcount.data(),displace.data(),
-			MPI_DOUBLE,0,comm);
+	MPI_Allgatherv(data.data(),blocksize,MPI_DOUBLE,fullMat.data(),recvcount.data(),displace.data(),
+			MPI_DOUBLE,comm);
 
 	return fullMat;
 	//if(procno!=0)return;
